@@ -38,6 +38,7 @@ if not ELEVENLABS_API_KEY:
 VOICES = {
     "steve": {
         "voice_id": "Rxk9LQxvNFEplpjjsjuN",
+        "agent_id": "agent_7201ksdab68ve5gac4qe25k39rch",
         "name": "Steve Harvey",
         "persona": (
             "You are Steve Harvey — comedian, host, and music industry veteran. "
@@ -48,6 +49,7 @@ VOICES = {
     },
     "vanito": {
         "voice_id": "eMQtaKLvw87ksRqmQVpS",
+        "agent_id": "agent_9801ksdabkaxfgfbhxqgb576qbd3",
         "name": "Vanito",
         "persona": (
             "You are Vanito, a rapper from Cincinnati. You're creative, energetic, "
@@ -81,36 +83,30 @@ async def get_personas():
 
 @app.get("/api/token")
 async def get_token(persona: str = "steve"):
-    """Get a conversation token for the ElevenLabs client."""
+    """Get a signed WebSocket URL for the ElevenLabs conversation."""
     import urllib.request
 
     persona_data = VOICES.get(persona)
     if not persona_data:
         return JSONResponse({"error": "Unknown persona"}, status_code=400)
 
-    # ElevenLabs conversation token endpoint
-    payload = json.dumps({
-        "agent_id": persona_data["voice_id"],
-        "first_message": (
-            "Hey! Steve Harvey here. Talk to me about music."
-            if persona == "steve"
-            else "Yo! It's Vanito. What's good?"
-        ),
-    }).encode()
+    agent_id = persona_data.get("agent_id")
+    if not agent_id:
+        return JSONResponse({"error": "No agent_id configured"}, status_code=500)
 
+    # Get signed URL from ElevenLabs
     req = urllib.request.Request(
-        "https://api.elevenlabs.io/v1/convai/conversation/get_token",
-        data=payload,
-        headers={
-            "xi-api-key": ELEVENLABS_API_KEY,
-            "Content-Type": "application/json",
-        },
+        f"https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id={agent_id}",
+        headers={"xi-api-key": ELEVENLABS_API_KEY},
     )
 
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-            return JSONResponse({"token": data.get("token", "")})
+            return JSONResponse({
+                "signed_url": data.get("signed_url", ""),
+                "agent_id": agent_id,
+            })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

@@ -326,31 +326,23 @@
       orb.className = 'orb disabled';
 
       try {
-        // Get conversation token from our server
+        // Get signed WebSocket URL from our server
         const tokenRes = await fetch(`/api/token?persona=${selectedPersona}`);
-        if (!tokenRes.ok) throw new Error('Failed to get conversation token');
-        const { token } = await tokenRes.json();
+        if (!tokenRes.ok) throw new Error('Failed to get signed URL');
+        const { signed_url } = await tokenRes.json();
 
-        // Connect to ElevenLabs via WebSocket
-        ws = new WebSocket(
-          `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${selectedPersona}`
-        );
+        if (!signed_url) throw new Error('No signed URL returned');
+
+        // Connect to ElevenLabs via signed WebSocket URL
+        ws = new WebSocket(signed_url);
 
         ws.onopen = async () => {
           console.log('[WS] Connected');
           isConnected = true;
 
-          // Send conversation config
-          ws.send(JSON.stringify({
-            type: 'conversation_initiation_client_data',
-            conversation_config_override: {
-              agent: {
-                first_message: selectedPersona === 'steve'
-                  ? "Hey! Steve Harvey here. Talk to me about music."
-                  : "Yo! It's Vanito. What's good?",
-              }
-            }
-          }));
+          // ElevenLabs ConvAI — send ping to keep alive
+          // The agent handles first_message from its config
+          ws.send(JSON.stringify({ type: "ping" }));
         };
 
         ws.onmessage = (event) => {
