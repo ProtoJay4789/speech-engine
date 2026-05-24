@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speech Engine — GenTech Labs</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      padding: 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #222;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #00d4ff;
+    }
+
+    .logo span { color: #666; font-weight: 400; }
+
+    .badge {
+      background: #1a1a2e;
+      color: #00d4ff;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      border: 1px solid #00d4ff33;
+    }
+
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 600px;
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+    }
+
+    h1 {
+      font-size: 32px;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    h1 em {
+      color: #00d4ff;
+      font-style: normal;
+    }
+
+    .subtitle {
+      color: #888;
+      text-align: center;
+      max-width: 400px;
+    }
+
+    /* Persona Cards */
+    .personas {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .persona-card {
+      flex: 1;
+      background: #111;
+      border: 2px solid #222;
+      border-radius: 16px;
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .persona-card:hover {
+      border-color: #00d4ff55;
+      background: #151520;
+    }
+
+    .persona-card.selected {
+      border-color: #00d4ff;
+      background: #0a1520;
+    }
+
+    .persona-avatar {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .persona-name {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .persona-desc {
+      font-size: 13px;
+      color: #888;
+    }
+
+    /* Voice Orb */
+    .orb-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .orb {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #00d4ff, #0066aa);
+      transition: all 0.3s;
+      cursor: pointer;
+      box-shadow: 0 0 40px #00d4ff22;
+    }
+
+    .orb.listening {
+      animation: pulse 1.5s infinite;
+      box-shadow: 0 0 60px #00d4ff44;
+    }
+
+    .orb.speaking {
+      animation: speak 0.3s infinite alternate;
+      background: radial-gradient(circle at 30% 30%, #00ff88, #00aa55);
+      box-shadow: 0 0 60px #00ff8844;
+    }
+
+    .orb.disabled {
+      background: #333;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    @keyframes speak {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.04); }
+    }
+
+    .orb-ring {
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      border: 2px solid #00d4ff22;
+      animation: ring-pulse 2s infinite;
+    }
+
+    @keyframes ring-pulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.02); }
+    }
+
+    .status-text {
+      font-size: 14px;
+      color: #888;
+      min-height: 24px;
+    }
+
+    /* Transcript */
+    .transcript-container {
+      width: 100%;
+      max-height: 300px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .transcript-msg {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 85%;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .transcript-msg.user {
+      background: #1a2a3a;
+      align-self: flex-end;
+      border: 1px solid #00d4ff33;
+    }
+
+    .transcript-msg.agent {
+      background: #1a1a2e;
+      align-self: flex-start;
+      border: 1px solid #00ff8833;
+    }
+
+    .transcript-label {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 16px;
+      text-align: center;
+      color: #444;
+      font-size: 12px;
+      border-top: 1px solid #1a1a1a;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">GenTech <span>Speech Engine</span></div>
+    <div class="badge">ElevenHacks #10</div>
+  </header>
+
+  <main>
+    <h1>Talk to <em>someone</em> who talks back</h1>
+    <p class="subtitle">
+      Real-time voice conversations with AI personas.
+      Pick a voice, click the orb, and start talking.
+    </p>
+
+    <div class="personas">
+      <div class="persona-card" data-persona="steve" onclick="selectPersona('steve')">
+        <div class="persona-avatar">🎤</div>
+        <div class="persona-name">Steve Harvey</div>
+        <div class="persona-desc">Music critic. Tough love. No filter.</div>
+      </div>
+      <div class="persona-card" data-persona="vanito" onclick="selectPersona('vanito')">
+        <div class="persona-avatar">🔥</div>
+        <div class="persona-name">Vanito</div>
+        <div class="persona-desc">Rapper. Creative. Always ready.</div>
+      </div>
+    </div>
+
+    <div class="orb-container">
+      <div class="orb-ring"></div>
+      <div id="orb" class="orb disabled" onclick="toggleConversation()"></div>
+    </div>
+
+    <div id="status" class="status-text">Select a persona to begin</div>
+
+    <div id="transcript" class="transcript-container"></div>
+  </main>
+
+  <footer>
+    GenTech Labs — ElevenHacks #10 — Real-time Voice Agents
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@elevenlabs/client@latest/dist/index.umd.js"></script>
+  <script>
+    // ── State ──────────────────────────────────────────────────────
+    let selectedPersona = null;
+    let conversation = null;
+    let ws = null;
+    let isConnected = false;
+    let isListening = false;
+
+    const orb = document.getElementById('orb');
+    const statusEl = document.getElementById('status');
+    const transcriptEl = document.getElementById('transcript');
+
+    // ── Persona Selection ──────────────────────────────────────────
+    function selectPersona(key) {
+      selectedPersona = key;
+
+      // Update UI
+      document.querySelectorAll('.persona-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.persona === key);
+      });
+
+      // Enable orb
+      orb.classList.remove('disabled');
+      setStatus(`Ready — click to talk to ${key === 'steve' ? 'Steve Harvey' : 'Vanito'}`);
+
+      // Disconnect previous session
+      if (isConnected) {
+        disconnect();
+      }
+    }
+
+    // ── Toggle Conversation ────────────────────────────────────────
+    async function toggleConversation() {
+      if (!selectedPersona) return;
+
+      if (isConnected) {
+        disconnect();
+      } else {
+        await connect();
+      }
+    }
+
+    // ── Connect ────────────────────────────────────────────────────
+    async function connect() {
+      if (!selectedPersona) return;
+
+      setStatus('Connecting...');
+      orb.className = 'orb disabled';
+
+      try {
+        // Get conversation token from our server
+        const tokenRes = await fetch(`/api/token?persona=${selectedPersona}`);
+        if (!tokenRes.ok) throw new Error('Failed to get conversation token');
+        const { token } = await tokenRes.json();
+
+        // Connect to ElevenLabs via WebSocket
+        ws = new WebSocket(
+          `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${selectedPersona}`
+        );
+
+        ws.onopen = async () => {
+          console.log('[WS] Connected');
+          isConnected = true;
+
+          // Send conversation config
+          ws.send(JSON.stringify({
+            type: 'conversation_initiation_client_data',
+            conversation_config_override: {
+              agent: {
+                first_message: selectedPersona === 'steve'
+                  ? "Hey! Steve Harvey here. Talk to me about music."
+                  : "Yo! It's Vanito. What's good?",
+              }
+            }
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          handleServerEvent(data);
+        };
+
+        ws.onerror = (err) => {
+          console.error('[WS] Error:', err);
+          setStatus('Connection error — check server');
+          disconnect();
+        };
+
+        ws.onclose = () => {
+          console.log('[WS] Closed');
+          if (isConnected) disconnect();
+        };
+
+      } catch (err) {
+        console.error('Connect error:', err);
+        setStatus(`Error: ${err.message}`);
+        orb.className = 'orb disabled';
+      }
+    }
+
+    // ── Disconnect ─────────────────────────────────────────────────
+    function disconnect() {
+      isConnected = false;
+      isListening = false;
+
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+
+      orb.className = 'orb';
+      setStatus(selectedPersona ? 'Disconnected — click to reconnect' : 'Select a persona');
+    }
+
+    // ── Handle Server Events ───────────────────────────────────────
+    function handleServerEvent(data) {
+      const type = data.type;
+
+      switch (type) {
+        case 'conversation_initiation_data':
+          // Ready — start listening
+          setStatus('Listening... speak now');
+          orb.className = 'orb listening';
+          isListening = true;
+
+          // Request microphone
+          startAudioCapture();
+          break;
+
+        case 'transcription':
+          // User speech (interim or final)
+          if (data.transcription && data.transcription.is_final) {
+            addMessage('user', data.transcription.text);
+            setStatus('Thinking...');
+          } else if (data.transcription) {
+            setStatus(`Hearing: "${data.transcription.text}"`);
+          }
+          break;
+
+        case 'agent_response':
+          // Agent is responding
+          if (data.agent_response) {
+            addMessage('agent', data.agent_response);
+            orb.className = 'orb speaking';
+            setStatus('Speaking...');
+          }
+          break;
+
+        case 'agent_response_correction':
+          // Agent corrected itself
+          if (data.agent_response) {
+            addMessage('agent', data.agent_response);
+          }
+          break;
+
+        case 'audio':
+          // Audio chunk — ElevenLabs handles playback automatically
+          break;
+
+        case 'interruption':
+          // User interrupted agent
+          setStatus('Interrupted — listening...');
+          orb.className = 'orb listening';
+          break;
+
+        case 'ping':
+          // Keepalive
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'pong' }));
+          }
+          break;
+
+        default:
+          console.log('[Event]', type, data);
+      }
+    }
+
+    // ── Audio Capture ──────────────────────────────────────────────
+    async function startAudioCapture() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Use ElevenLabs client for WebRTC audio streaming
+        // For WebSocket mode, we send raw PCM chunks
+        const audioContext = new AudioContext({ sampleRate: 16000 });
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        processor.onaudioprocess = (event) => {
+          if (!isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+          const inputData = event.inputBuffer.getChannelData(0);
+          // Convert float32 to int16 PCM
+          const pcm = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            pcm[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+          }
+
+          // Send as base64
+          const bytes = new Uint8Array(pcm.buffer);
+          const base64 = btoa(String.fromCharCode(...bytes));
+
+          ws.send(JSON.stringify({
+            user_audio_chunk: base64,
+          }));
+        };
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        // Store for cleanup
+        window._audioStream = stream;
+        window._audioContext = audioContext;
+        window._processor = processor;
+
+      } catch (err) {
+        console.error('Microphone error:', err);
+        setStatus('Microphone access denied');
+      }
+    }
+
+    // ── Transcript UI ──────────────────────────────────────────────
+    function addMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `transcript-msg ${role}`;
+      div.innerHTML = `
+        <div class="transcript-label">${role === 'user' ? 'You' : (selectedPersona === 'steve' ? 'Steve' : 'Vanito')}</div>
+        ${text}
+      `;
+      transcriptEl.appendChild(div);
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    }
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+  </script>
+</body>
+</html>
