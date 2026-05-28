@@ -31,10 +31,18 @@ load_dotenv()
 
 # ── Config ───────────────────────────────────────────────────────────────
 
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-if not ELEVENLABS_API_KEY:
-    raise RuntimeError("ELEVENLABS_API_KEY required")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
+# Edge TTS fallback (free, no API key needed)
+EDGE_TTS_AVAILABLE = False
+try:
+    import edge_tts
+    import tempfile
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    print("Warning: edge-tts not installed. Edge TTS fallback disabled.")
+
+# Voice personas with ElevenLabs + Edge TTS fallback
 VOICES = {
     "steve": {
         "voice_id": "Rxk9LQxvNFEplpjjsjuN",
@@ -46,6 +54,10 @@ VOICES = {
             "and praise great ones. You're warm but direct. Keep responses under "
             "30 seconds when spoken. Never mention being AI. Just be Steve."
         ),
+        # Edge TTS fallback: Andrew voice (warm, confident, authoritative)
+        "edge_tts_voice": "en-US-AndrewNeural",
+        "edge_tts_rate": "-5%",
+        "edge_tts_pitch": "-2Hz",
     },
     "vanito": {
         "voice_id": "eMQtaKLvw87ksRqmQVpS",
@@ -57,6 +69,10 @@ VOICES = {
             "and keep the vibe going. Keep responses under 30 seconds when spoken. "
             "Never mention being AI. Just be Vanito."
         ),
+        # Edge TTS fallback: Brian voice (approachable, casual)
+        "edge_tts_voice": "en-US-BrianNeural",
+        "edge_tts_rate": "+0%",
+        "edge_tts_pitch": "+0Hz",
     },
 }
 
@@ -191,6 +207,75 @@ async def generate_response(
 
     # Fallback: smart demo responses
     return _demo_response(persona, user_input)
+
+
+async def text_to_speech(text: str, persona: dict) -> Optional[str]:
+    """
+    Convert text to speech using ElevenLabs or Edge TTS fallback.
+    Returns path to audio file.
+    """
+    # Try ElevenLabs first if API key is valid
+    if ELEVENLABS_API_KEY and persona.get("voice_id"):
+        try:
+            return await _elevenlabs_tts(text, persona["voice_id"])
+        except Exception as e:
+            print(f"[TTS] ElevenLabs failed: {e}, falling back to Edge TTS")
+
+    # Edge TTS fallback
+    if EDGE_TTS_AVAILABLE and persona.get("edge_tts_voice"):
+        return await _edge_tts(text, persona)
+
+    return None
+
+
+async def _elevenlabs_tts(text: str, voice_id: str) -> Optional[str]:
+    """Generate speech using ElevenLabs API."""
+    import tempfile
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    payload = json.dumps({
+        "text": text,
+        "model_id": "eleven_monolingual_v1",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75,
+        },
+    }).encode()
+
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json",
+        },
+    )
+
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        audio_data = resp.read()
+
+    # Save to temp file
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    tmp.write(audio_data)
+    tmp.close()
+    return tmp.name
+
+
+async def _edge_tts(text: str, persona: dict) -> Optional[str]:
+    """Generate speech using Edge TTS (free fallback)."""
+    import tempfile
+
+    voice = persona.get("edge_tts_voice", "en-US-AndrewNeural")
+    rate = persona.get("edge_tts_rate", "+0%")
+    pitch = persona.get("edge_tts_pitch", "+0Hz")
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    tmp.close()
+
+    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)  # type: ignore
+    await communicate.save(tmp.name)
+
+    return tmp.name
 
 
 async def _call_llm(
